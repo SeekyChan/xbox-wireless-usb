@@ -16,7 +16,7 @@ void stop(int) { running = 0; }
 using Clock = std::chrono::steady_clock;
 double deadzone(double x) { return std::abs(x) < 0.08 ? 0.0 : x; }
 struct Args {
-    std::string plc_ip;
+    std::string plc_ip = "192.168.2.69";
     int level = 1; // start slow for physical tests
     bool live = false;
     bool acknowledged = false;
@@ -46,7 +46,7 @@ bool parse(int argc, char** argv, Args& a) {
             }
         } else return false;
     }
-    return !a.live || (a.acknowledged && !a.plc_ip.empty());
+    return !a.live || a.acknowledged;
 }
 }
 
@@ -57,11 +57,12 @@ int main(int argc, char** argv) {
     std::signal(SIGTERM, stop);
 
     const double max_vx = args.level * 0.1;
-    const double max_wz = args.level * 0.2;
+    const double max_vy = args.level * 0.1;
+    const double max_wz = std::min(1.0, args.level * 0.2);
     std::cout << "Mode: " << (args.live ? "LIVE PLC UDP" : "DRY RUN (no UDP)")
               << ", level=" << args.level << ", max vx=" << max_vx
-              << " m/s, max wz=" << max_wz << " rad/s\n";
-    std::cout << "LY up = forward, RX left = positive CCW; hold RB = deadman.\n";
+              << " m/s, max vy=" << max_vy << " m/s, max wz=" << max_wz << " rad/s\n";
+    std::cout << "LY up -> +vx, LX left -> +vy, RX left -> +wz; hold RB = deadman.\n";
     std::cout << "Physical E-stop required. This is NOT a safety controller.\n";
 
     PlcUdp plc;
@@ -119,9 +120,10 @@ int main(int argc, char** argv) {
                              (!args.live || reply_recent);
         // No deadman, stale USB, missing PLC heartbeat => 0 speed, enable=0.
         const double vx = enabled ? deadzone(state.ly) * max_vx : 0.0;
+        const double vy = enabled ? -deadzone(state.lx) * max_vy : 0.0;
         const double wz = enabled ? -deadzone(state.rx) * max_wz : 0.0;
 
-        if (args.live && !plc.sendVelocity(vx, wz, enabled)) {
+        if (args.live && !plc.sendVelocity(vx, vy, wz, enabled)) {
             std::cerr << "[PLC] UDP send failed; exiting after stop attempts\n";
             io_failed = true;
             break;
@@ -132,10 +134,10 @@ int main(int argc, char** argv) {
         if (now >= next_log) {
             std::cout << std::fixed << std::setprecision(3)
                       << "[" << (args.live ? "LIVE" : "DRY") << "]"
-                      << " LY=" << state.ly << " RX=" << state.rx
+                      << " LX=" << state.lx << " LY=" << state.ly << " RX=" << state.rx
                       << " RB=" << state.rb << " fresh=" << input_recent
                       << " plc_ack=" << (args.live ? reply_recent : false)
-                      << " -> cmd vx=" << vx << " wz=" << wz
+                      << " -> cmd vx=" << vx << " vy=" << vy << " wz=" << wz
                       << " enable=" << enabled << '\n';
             next_log = now + std::chrono::milliseconds(200);
         }
@@ -146,7 +148,7 @@ int main(int argc, char** argv) {
 
     if (args.live) {
         for (int i = 0; i < 10; ++i) {
-            plc.sendVelocity(0.0, 0.0, false);
+            plc.sendVelocity(0.0, 0.0, 0.0, false);
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
         std::cout << "[SAFE] sent ten disable/zero UDP packets (delivery not guaranteed)\n";
