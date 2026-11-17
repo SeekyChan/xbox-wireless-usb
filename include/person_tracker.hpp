@@ -8,6 +8,8 @@ namespace vision {
 
 struct Rect {
     float x = 0, y = 0, w = 0, h = 0;
+    Rect() = default;
+    Rect(float x_, float y_, float w_, float h_) : x(x_), y(y_), w(w_), h(h_) {}
 };
 struct Detection {
     Rect box;
