@@ -33,28 +33,26 @@ if(BUILD_TESTING)
     add_test(NAME plc_packet_test COMMAND plc_packet_test)
 endif()
 
-# Camera apps are independent of the PLC motor-control executable.
-# On Ubuntu, pkg-config opencv4 is more reliable than probing optional CMake
-# package components; the package exports all linked OpenCV libraries incl. DNN.
-pkg_check_modules(OPENCV4 QUIET IMPORTED_TARGET opencv4)
-if(OPENCV4_FOUND)
-    message(STATUS "OpenCV via pkg-config: ${OPENCV4_VERSION}")
-    message(STATUS "OpenCV DNN available through opencv4 link interface")
-    add_executable(person_vision src/person_vision_main.cpp)
-    target_include_directories(person_vision PRIVATE include)
-    target_link_libraries(person_vision PRIVATE PkgConfig::OPENCV4)
-    target_compile_options(person_vision PRIVATE -Wall -Wextra -Wpedantic)
-    install(TARGETS person_vision RUNTIME DESTINATION bin)
-
-    add_executable(person_leg_vision src/person_leg_vision_main.cpp)
-    target_include_directories(person_leg_vision PRIVATE include)
-    target_link_libraries(person_leg_vision PRIVATE PkgConfig::OPENCV4)
-    target_compile_options(person_leg_vision PRIVATE -Wall -Wextra -Wpedantic)
-    install(TARGETS person_leg_vision RUNTIME DESTINATION bin)
-    message(STATUS "person_leg_vision target: ENABLED")
-else()
-    message(WARNING "opencv4 pkg-config package not found: skipping camera apps. Install libopencv-dev and pkg-config.")
+# Vision dependencies are required for the camera program.
+# Fail at configure time instead of silently omitting person_leg_vision.
+pkg_check_modules(OPENCV4 REQUIRED IMPORTED_TARGET opencv4)
+message(STATUS "OpenCV version: ${OPENCV4_VERSION}")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/person_leg_vision_main.cpp")
+    message(FATAL_ERROR "src/person_leg_vision_main.cpp missing. Run git pull origin main in the project root.")
 endif()
+
+add_executable(person_vision src/person_vision_main.cpp)
+target_include_directories(person_vision PRIVATE include)
+target_link_libraries(person_vision PRIVATE PkgConfig::OPENCV4)
+target_compile_options(person_vision PRIVATE -Wall -Wextra -Wpedantic)
+install(TARGETS person_vision RUNTIME DESTINATION bin)
+
+add_executable(person_leg_vision src/person_leg_vision_main.cpp)
+target_include_directories(person_leg_vision PRIVATE include)
+target_link_libraries(person_leg_vision PRIVATE PkgConfig::OPENCV4)
+target_compile_options(person_leg_vision PRIVATE -Wall -Wextra -Wpedantic)
+install(TARGETS person_leg_vision RUNTIME DESTINATION bin)
+message(STATUS "person_leg_vision: REQUIRED and ENABLED")
 
 if(BUILD_TESTING)
     # The tracker itself is pure C++11 and can be tested without a camera.
