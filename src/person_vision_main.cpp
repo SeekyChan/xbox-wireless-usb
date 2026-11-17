@@ -6,6 +6,7 @@
 #include <opencv2/videoio.hpp>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -149,7 +150,8 @@ int main(int argc, char** argv) {
     hog.setSVMDetector(cv::HOGDescriptor::getDefaultPeopleDetector());
 
     vision::PersonTracker tracker(8);
-    Selection selection{&tracker, -1};
+    Selection selection;
+    selection.tracker = &tracker;
     const std::string window = "USB Camera - Person Detection & Tracking (No PLC)";
     cv::namedWindow(window, cv::WINDOW_AUTOSIZE);
     cv::setMouseCallback(window, mouse, &selection);
