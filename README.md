@@ -1,6 +1,6 @@
-# Xbox Wireless USB Receiver Test (EPC3562)
+# Xbox Wireless USB Receiver Test
 
-A standalone C++11/CMake diagnostic program for the USB wireless receiver tested with EPC3562 (Rockchip Linux ARM 5.10).
+A standalone C++11/CMake diagnostic program for the USB wireless receiver. **Primary test target: x86_64 Ubuntu**; the same source can later be cross-compiled for EPC3562 (ARM Linux).
 
 - Receiver VID:PID: `2345:e053`
 - Vendor-specific interface: `0`
@@ -41,7 +41,7 @@ Optional:
 ./build/xbox_usb_test --help
 ```
 
-Cross-compiling: pass `-DCMAKE_TOOLCHAIN_FILE=/path/to/toolchain.cmake`, and make sure pkg-config resolves **ARM-target** libusb.
+For x86_64 Ubuntu, use the native build steps above. No cross-toolchain is required.\n\nCross-compiling: pass `-DCMAKE_TOOLCHAIN_FILE=/path/to/toolchain.cmake`, and make sure pkg-config resolves **ARM-target** libusb.
 
 ## USB permissions
 
