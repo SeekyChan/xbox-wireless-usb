@@ -33,35 +33,27 @@ if(BUILD_TESTING)
     add_test(NAME plc_packet_test COMMAND plc_packet_test)
 endif()
 
-# Camera-only vision programs; never link them to PlcUdp or motor control.
-# Resolve OpenCV ONCE. A second find_package with a different COMPONENTS list
-# can invalidate OpenCV_FOUND in some distro configurations.
-find_package(OpenCV QUIET)
-if(OpenCV_FOUND)
-    message(STATUS "OpenCV found: ${OpenCV_VERSION}")
-    message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
-
+# Camera apps are independent of the PLC motor-control executable.
+# On Ubuntu, pkg-config opencv4 is more reliable than probing optional CMake
+# package components; the package exports all linked OpenCV libraries incl. DNN.
+pkg_check_modules(OPENCV4 QUIET IMPORTED_TARGET opencv4)
+if(OPENCV4_FOUND)
+    message(STATUS "OpenCV via pkg-config: ${OPENCV4_VERSION}")
+    message(STATUS "OpenCV DNN available through opencv4 link interface")
     add_executable(person_vision src/person_vision_main.cpp)
-    target_include_directories(person_vision PRIVATE include ${OpenCV_INCLUDE_DIRS})
-    target_link_libraries(person_vision PRIVATE ${OpenCV_LIBS})
+    target_include_directories(person_vision PRIVATE include)
+    target_link_libraries(person_vision PRIVATE PkgConfig::OPENCV4)
     target_compile_options(person_vision PRIVATE -Wall -Wextra -Wpedantic)
     install(TARGETS person_vision RUNTIME DESTINATION bin)
 
-    # OpenCV's exported target is authoritative when the package is installed
-    # using apt on Ubuntu, including version 4.6.
-    list(FIND OpenCV_LIBS opencv_dnn _opencv_dnn_index)
-    if(TARGET opencv_dnn OR NOT _opencv_dnn_index EQUAL -1)
-        add_executable(person_leg_vision src/person_leg_vision_main.cpp)
-        target_include_directories(person_leg_vision PRIVATE include ${OpenCV_INCLUDE_DIRS})
-        target_link_libraries(person_leg_vision PRIVATE ${OpenCV_LIBS})
-        target_compile_options(person_leg_vision PRIVATE -Wall -Wextra -Wpedantic)
-        install(TARGETS person_leg_vision RUNTIME DESTINATION bin)
-        message(STATUS "person_leg_vision: enabled (OpenCV DNN available)")
-    else()
-        message(WARNING "OpenCV found but DNN component unavailable. Install libopencv-dev/libopencv-dnn-dev and reconfigure.")
-    endif()
+    add_executable(person_leg_vision src/person_leg_vision_main.cpp)
+    target_include_directories(person_leg_vision PRIVATE include)
+    target_link_libraries(person_leg_vision PRIVATE PkgConfig::OPENCV4)
+    target_compile_options(person_leg_vision PRIVATE -Wall -Wextra -Wpedantic)
+    install(TARGETS person_leg_vision RUNTIME DESTINATION bin)
+    message(STATUS "person_leg_vision target: ENABLED")
 else()
-    message(STATUS "OpenCV not found; skipping camera apps (install libopencv-dev)")
+    message(WARNING "opencv4 pkg-config package not found: skipping camera apps. Install libopencv-dev and pkg-config.")
 endif()
 
 if(BUILD_TESTING)
