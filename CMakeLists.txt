@@ -13,3 +13,22 @@ target_link_libraries(xbox_usb_test PRIVATE PkgConfig::LIBUSB)
 target_compile_options(xbox_usb_test PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS xbox_usb_test RUNTIME DESTINATION bin)
+
+# Standalone PLC teleoperation (no ROS dependency)
+add_executable(xbox_plc_teleop
+    src/teleop_main.cpp
+    src/gamepad.cpp
+    src/plc_udp.cpp
+)
+target_include_directories(xbox_plc_teleop PRIVATE include)
+target_link_libraries(xbox_plc_teleop PRIVATE PkgConfig::LIBUSB)
+target_compile_options(xbox_plc_teleop PRIVATE -Wall -Wextra -Wpedantic)
+install(TARGETS xbox_plc_teleop RUNTIME DESTINATION bin)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(plc_packet_test tests/plc_packet_test.cpp src/plc_udp.cpp)
+    target_include_directories(plc_packet_test PRIVATE include)
+    target_compile_options(plc_packet_test PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME plc_packet_test COMMAND plc_packet_test)
+endif()
