@@ -174,19 +174,13 @@ float overlap(const vision::Rect& a, const vision::Rect& b) {
     return area <= 0 ? 0 : common/area;
 }
 bool legsCenter(const Pose& p, cv::Point2f& point, int& count) {
-    // Knee and ankle keypoints, 13/14/15/16. Both left & right needed.
+    // COCO keypoints 13 and 14 = left/right KNEES.
+    // Both knee confidences are required; do not substitute ankles.
     count = 0;
-    cv::Point2f sum(0, 0);
-    const bool left = p.scores[13] >= kJointThreshold || p.scores[15] >= kJointThreshold;
-    const bool right = p.scores[14] >= kJointThreshold || p.scores[16] >= kJointThreshold;
-    if (!left || !right) return false;
-    for (int i = 13; i <= 16; ++i) {
-        if (p.scores[i] < kJointThreshold) continue;
-        sum += p.points[i];
-        ++count;
-    }
-    if (count < 2) return false;
-    point = sum * (1.0f / count);
+    if (p.scores[13] < kJointThreshold || p.scores[14] < kJointThreshold)
+        return false;
+    point = (p.points[13] + p.points[14]) * 0.5f;
+    count = 2;
     return true;
 }
 void drawLegs(cv::Mat& frame, const Pose& pose, const cv::Scalar& color) {
@@ -299,21 +293,27 @@ int main(int argc, char** argv) {
             const bool both = legsCenter(p, leg, valid);
             if (both) cv::drawMarker(frame, leg, color, cv::MARKER_CROSS, 20, 2);
             const float err = both ? (leg.x - frame.cols*0.5f)/(frame.cols*0.5f) : 0.0f;
+            // Camera-only control preview: target left -> positive CCW yaw.
+            // Vx=0 since a monocular midpoint cannot tell if approaching is safe.
+            const float wz_preview = (focus && both)
+                ? std::max(-0.2f, std::min(0.2f, -0.2f * (std::abs(err) < 0.08f ? 0.0f : err)))
+                : 0.0f;
             std::ostringstream label;
             label << "ID " << t.id << (both ? " LEGS OK " : " LEGS NOT VISIBLE ");
             if (both) label << std::fixed << std::setprecision(2) << "x=" << err;
+            if (focus) label << " Wz_preview=" << std::fixed << std::setprecision(3) << wz_preview;
             cv::putText(frame, label.str(),
                         cv::Point(std::max(0,b.x),std::max(48,b.y-7)),
                         cv::FONT_HERSHEY_SIMPLEX,0.46,color,2,cv::LINE_AA);
             if (focus && both && (frames % 15 == 0)) {
                 std::cout << "[LEGS] target=" << t.id << " normalized_x="
                           << std::fixed << std::setprecision(3) << err
-                          << " visible_knee_ankle=" << valid << '\n';
+                          << " knees_visible=" << valid << " vx_preview=0 vy_preview=0 wz_preview=" << wz_preview << '\n';
             }
         }
         cv::rectangle(frame, cv::Rect(0,0,frame.cols,33), cv::Scalar(30,30,30), -1);
         std::ostringstream header;
-        header << "POSE / 2-LEG TRACKING | CAMERA ONLY | NO UDP | FPS "
+        header << "POSE / KNEE(13,14) CENTER | Vx=0 Vy=0 | NO UDP | FPS "
                << std::fixed << std::setprecision(1) << fps;
         cv::putText(frame, header.str(),cv::Point(9,23),
                     cv::FONT_HERSHEY_SIMPLEX,0.49,cv::Scalar(255,255,255),1,cv::LINE_AA);
