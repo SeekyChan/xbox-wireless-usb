@@ -6,3 +6,10 @@ compile_commands.json
 *.o
 *.so
 *.a
+
+# Local ML models and inference recordings (not committed)
+models/*.onnx
+models/*.pt
+models/*.engine
+*.avi
+*.mp4
