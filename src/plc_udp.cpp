@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 
@@ -22,17 +23,21 @@ uint8_t checksum(const uint8_t* p, size_t n) {
     for (size_t i = 0; i < n; ++i) sum += p[i];
     return uint8_t(sum & 0xff);
 }
-uint8_t motion(double vx, double wz, bool enable) {
-    if (!enable || (std::abs(vx) < 0.0005 && std::abs(wz) < 0.0005)) return 0;
-    if (std::abs(vx) < 0.0005) return 5; // self-spin
-    return vx > 0 ? 1 : 2; // forward/backward, including simultaneous steering
+uint8_t motion(double vx, double vy, double wz, bool enable) {
+    constexpr double eps = 0.0005;
+    if (!enable || (std::abs(vx) < eps && std::abs(vy) < eps && std::abs(wz) < eps)) return 0;
+    // The motion type also selects an obstacle-detection sector on the PLC.
+    if (std::abs(vx) >= eps && std::abs(vy) >= eps) return vy > 0 ? 6 : 7;
+    if (std::abs(vy) >= eps) return vy > 0 ? 3 : 4;
+    if (std::abs(vx) >= eps) return vx > 0 ? 1 : 2;
+    return 5;
 }
 }
 
 PlcUdp::~PlcUdp() { close(); }
 
 std::vector<uint8_t> PlcUdp::encode(uint32_t seq, uint32_t ip_be,
-                                   double vx, double wz, bool enable) {
+                                   double vx, double vy, double wz, bool enable) {
     std::vector<uint8_t> b;
     b.reserve(49);
     u16(b, 0xFAFF);             // fixed header, little endian: FF FA
@@ -44,12 +49,23 @@ std::vector<uint8_t> PlcUdp::encode(uint32_t seq, uint32_t ip_be,
     u16(b, 24);                 // body length
     u64(b, 0);                  // reserved
 
+    // Clamp to conservative component ceilings; the PLC applies its own configuration limits.
+    // Ensure all arguments are finite before encoding.
+    if (!std::isfinite(vx) || !std::isfinite(vy) || !std::isfinite(wz)) {
+        vx = vy = wz = 0.0;
+        enable = false;
+    }
+    const auto clampUnit = [](double v) { return std::max(-1.0, std::min(1.0, v)); };
+    vx = clampUnit(vx);
+    vy = clampUnit(vy);
+    wz = clampUnit(wz);
     const int16_t sx = static_cast<int16_t>(std::lround(vx * 1000.0));
+    const int16_t sy = static_cast<int16_t>(std::lround(vy * 1000.0));
     const int16_t sw = static_cast<int16_t>(std::lround(wz * 1000.0));
     u16(b, uint16_t(enable ? sx : 0)); // Vx, 0.001 m/s
-    u16(b, 0);                         // Vy
+    u16(b, uint16_t(enable ? sy : 0)); // Vy, 0.001 m/s
     u16(b, uint16_t(enable ? sw : 0)); // W, 0.001 rad/s
-    b.push_back(motion(vx, wz, enable)); // motion type
+    b.push_back(motion(vx, vy, wz, enable)); // motion type
     b.push_back(0);                   // voice ID
     b.push_back(0);                   // obstacle zone (site-specific, REVIEW!)
     b.push_back(0);                   // obstacle state: normal
@@ -115,9 +131,9 @@ void PlcUdp::close() {
     if (fd_ >= 0) ::close(fd_);
     fd_ = -1;
 }
-bool PlcUdp::sendVelocity(double vx, double wz, bool enable) {
+bool PlcUdp::sendVelocity(double vx, double vy, double wz, bool enable) {
     if (fd_ < 0) return false;
-    const auto p = encode(++sequence_, sender_ipv4_be_, vx, wz, enable);
+    const auto p = encode(++sequence_, sender_ipv4_be_, vx, vy, wz, enable);
     const ssize_t sent = send(fd_, p.data(), p.size(), 0);
     if (sent != static_cast<ssize_t>(p.size())) {
         std::cerr << "UDP send: " << std::strerror(errno) << '\n';
