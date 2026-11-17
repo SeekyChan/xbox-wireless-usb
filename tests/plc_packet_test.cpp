@@ -44,5 +44,10 @@ int main() {
     const auto diagonal = PlcUdp::encode(7, ip, 0.1, 0.1, 0.0, true);
     assert(diagonal[30] == 6);
     assert(PlcUdp::verify(diagonal.data(), diagonal.size()));
+    const auto limit = PlcUdp::encode(8, ip, 0.2, -0.2, 0.2, true);
+    assert(limit[24] == 0xC8 && limit[25] == 0x00);
+    assert(limit[26] == 0x38 && limit[27] == 0xFF);
+    assert(limit[28] == 0xC8 && limit[29] == 0x00);
+    assert(PlcUdp::verify(limit.data(), limit.size()));
     std::cout << "plc_packet_test PASS (format uses documented fields + 1-byte checksum assumption)\n";
 }
