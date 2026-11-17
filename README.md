@@ -27,7 +27,7 @@ plc_port=1101
 local_port=1101
 udp_enabled=true
 max_vx_mps=0.2
-max_vy_mps=0.2
+max_vy_mps=0.0
 max_wz_radps=0.2
 ```
 
@@ -36,7 +36,7 @@ Move velocity channels through `Gamepad` and `PlcUdp`:
 | Controller | Output | Max | Raw integer at max |
 | --- | --- | --- | --- |
 | Left stick vertical (LY) | Vx, forward / backward | ±0.2 m/s | ±200 |
-| Left stick horizontal (LX) | Vy, lateral left / right | ±0.2 m/s | ±200 |
+| Left stick horizontal (LX) | Unused, Vy always zero | 0 m/s | 0 |
 | Right stick horizontal (RX) | Wz, counterclockwise / clockwise | ±0.2 rad/s | ±200 |
 
 The receiver is `2345:e053`, USB interface 0, endpoint 0x82. Speed conversion to the UDP payload multiplies physical units by 1000 and rounds to the nearest integer. The program logs values in m/s, rad/s, **and the encoded raw integers**.
@@ -146,7 +146,7 @@ tests/person_tracker_test.cpp  无摄像头的跟踪单元测试
 
 ## 第二代视觉：双腿关键点识别和目标跟踪（推荐）
 
-之前的 person_vision 使用传统 HOG，近距离/局部身体识别效果有限。新增 person_leg_vision 使用姿态估计 ONNX 模型，识别双腿关键点，特别是左右膝盖 (13,14)、左右脚踝 (15,16)，并参考髋关节 (11,12)。它会计算双腿中心位置、绘制骨架，并维持临时目标 ID。
+之前的 person_vision 使用传统 HOG，近距离/局部身体识别效果有限。新增 person_leg_vision 使用姿态估计 ONNX 模型，识别双腿关键点，特别是左右膝盖 (13,14)，并绘制脚踝 (15,16)、髋部 (11,12) 参考骨架。它使用两个膝盖的中点作为目标位置、绘制骨架，并维持临时目标 ID。
 
 **独立视觉程序，不包含任何 PLC / UDP 控制连接。不会让小车移动。** 原有手柄/PLC 程序不受影响。
 
@@ -228,3 +228,8 @@ src/person_leg_vision_main.cpp   ONNX Pose + 双腿关键点显示
 include/person_tracker.hpp       复用临时 ID 关联
 models/                          本地模型，不入 Git
 ~~~
+
+
+### 更新：仅使用膝盖 13/14 的中点进行转向预览
+
+YOLO Pose 关键点 13 与 14 分别对应左右膝盖。只有两点均达到置信度阈值时才计算中点与水平误差。选定目标后，摄像头程序只预览 `Wz = clamp(-0.2 * error_x, -0.2, +0.2)`，中心死区为 0.08；`Vx_preview=0`、`Vy_preview=0`。**不会发送 UDP**。这是因为单目图像中膝盖中点只能决定目标方位，不能测量安全的车人间距；缺少可靠测距与避障前，不让视觉控制自动前进。已有手柄控制只保留 `Vx` 和 `Wz`，`Vy=0`，左摇杆横向操作不再下发。
