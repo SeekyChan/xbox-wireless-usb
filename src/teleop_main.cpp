@@ -138,7 +138,6 @@ int main(int argc, char** argv) {
     if (!opened) std::cerr << "Gamepad not open (check USB permissions).\n";
     GamepadState state{};
     auto last_input = Clock::time_point::min();
-    auto last_reply = Clock::time_point::min();
     auto next_reopen = Clock::now() + std::chrono::seconds(1);
     auto next_log = Clock::now();
     auto next_tick = Clock::now();
@@ -170,14 +169,13 @@ int main(int argc, char** argv) {
                 last_input = Clock::now();
             }
         }
-        if (live && plc.receiveReply()) last_reply = Clock::now();
 
         const auto now = Clock::now();
         const bool freshInput = opened && last_input != Clock::time_point::min()
                                && now - last_input <= std::chrono::milliseconds(250);
-        const bool freshReply = last_reply != Clock::time_point::min()
-                               && now - last_reply <= std::chrono::milliseconds(400);
-        const bool enabled = freshInput && state.rb && (!live || freshReply);
+        // Send commands without requiring any PLC response.
+        // Retain the joystick freshness and RB hold-to-run protections.
+        const bool enabled = freshInput && state.rb;
 
         const double vx = enabled ? deadzone(state.ly) * config.max_vx_mps : 0.0;
         const double vy = enabled ? -deadzone(state.lx) * config.max_vy_mps : 0.0;
@@ -196,7 +194,6 @@ int main(int argc, char** argv) {
                       << "[" << (live ? "LIVE" : "DRY") << "]"
                       << " LX=" << state.lx << " LY=" << state.ly << " RX=" << state.rx
                       << " RB=" << state.rb << " fresh=" << freshInput
-                      << " plc_ack=" << (live ? freshReply : false)
                       << " -> vx=" << vx << " vy=" << vy << " wz=" << wz
                       << " (raw " << std::lround(vx * 1000)
                       << "," << std::lround(vy * 1000)
