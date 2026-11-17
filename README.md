@@ -41,7 +41,7 @@ Move velocity channels through `Gamepad` and `PlcUdp`:
 
 The receiver is `2345:e053`, USB interface 0, endpoint 0x82. Speed conversion to the UDP payload multiplies physical units by 1000 and rounds to the nearest integer. The program logs values in m/s, rad/s, **and the encoded raw integers**.
 
-**Hold RB** to enable speed commands; releasing RB sends zero/disabled. The output also returns to zero if valid gamepad messages stop arriving for 250 ms, or valid PLC replies have not been received for 400 ms. The loop sends at 50 Hz.
+**Hold RB** to enable speed commands; releasing RB sends zero/disabled. The output also returns to zero if valid gamepad messages stop arriving for 250 ms, and does not require PLC acknowledgements. The loop sends at 50 Hz.
 
 ## Test without UDP traffic
 
@@ -67,7 +67,7 @@ sudo ./build/xbox_usb_test --no-raw
 
 This program can command a **physical mobile robot**. Only test in an isolated space with a working physical emergency stop, verified PLC communications-loss stopping, adequate clearance, and supervision. Stop the normal PLC command writer / ROS controller before using this utility; ensure port 1101 has one responsible controller.
 
-The UDP implementation and PLC response parsing **have not been confirmed on real hardware**. Incoming replies currently pass basic frame/checksum checks, but are not fully decoded into PLC fault and automatic/manual states. If no valid reply arrives, the program sends zero/disabled packets, and holding RB will not produce movement. Verify PLC firmware protocol compatibility, interlocks, checksum, and supported combined-motion cases before moving a real vehicle. The program does not override physical safety circuits; failed UDP delivery cannot guarantee a stop.
+The UDP implementation **has not been confirmed on real hardware**. The command loop sends without waiting for PLC acknowledgements; the program therefore cannot confirm that the PLC received or accepted a command, nor detect PLC fault / E-stop state from responses. Verify PLC firmware protocol compatibility, interlocks, checksum, and supported combined-motion cases before moving a real vehicle. The program does not override physical safety circuits; failed UDP delivery cannot guarantee a stop.
 
 ## Files
 
