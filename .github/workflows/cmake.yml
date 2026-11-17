@@ -1,0 +1,17 @@
+name: CMake CI
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ pkg-config libusb-1.0-0-dev
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j2
+      - name: Packet unit tests
+        run: ctest --test-dir build --output-on-failure
