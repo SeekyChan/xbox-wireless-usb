@@ -1,5 +1,6 @@
 #include <libusb-1.0/libusb.h>
 #include <algorithm>
+#include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
@@ -73,6 +74,61 @@ const Button buttons[] = {
     {"LB", 3, 0x01}, {"RB", 3, 0x02},
     {"GUIDE", 3, 0x04}, {"A", 3, 0x10},
     {"B", 3, 0x20}, {"X", 3, 0x40}, {"Y", 3, 0x80}
+};
+
+
+int16_t readAxis(const unsigned char* p) {
+    const uint16_t bits = static_cast<uint16_t>(p[0]) |
+                          (static_cast<uint16_t>(p[1]) << 8);
+    const int32_t value = bits < 0x8000u ? static_cast<int32_t>(bits)
+                                        : static_cast<int32_t>(bits) - 65536;
+    return static_cast<int16_t>(value);
+}
+
+double normalizeAxis(int16_t value) {
+    return value < 0 ? static_cast<double>(value) / 32768.0
+                     : static_cast<double>(value) / 32767.0;
+}
+
+class StickDecoder {
+public:
+    void onPacket(const unsigned char* d, int n) {
+        if (n != 20 || d[0] != 0x00 || d[1] != 0x14) {
+            initialized_ = false;
+            return;
+        }
+
+        const int16_t axes[4] = {
+            readAxis(d + 6), readAxis(d + 8),
+            readAxis(d + 10), readAxis(d + 12)
+        };
+        const char* names[] = {"LX", "LY", "RX", "RY"};
+        bool changed = !initialized_;
+        for (int i = 0; i < 4; ++i) {
+            if (std::abs(static_cast<int>(axes[i]) -
+                         static_cast<int>(lastPrinted_[i])) >= 1200 ||
+                (axes[i] == 0 && lastPrinted_[i] != 0)) {
+                changed = true;
+            }
+        }
+        if (!changed) return;
+
+        std::cout << "[STICK] ";
+        for (int i = 0; i < 4; ++i) {
+            if (i) std::cout << " | ";
+            std::cout << names[i] << "=" << std::setw(6) << axes[i]
+                      << " (" << std::showpos << std::fixed
+                      << std::setprecision(3) << normalizeAxis(axes[i])
+                      << std::noshowpos << ")";
+            lastPrinted_[i] = axes[i];
+        }
+        std::cout << "\\n";
+        initialized_ = true;
+    }
+
+private:
+    bool initialized_ = false;
+    int16_t lastPrinted_[4] = {0, 0, 0, 0};
 };
 
 class InputDecoder {
@@ -155,6 +211,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "[OK] Interface claimed. Press buttons; Ctrl+C to quit.\n";
     InputDecoder decoder;
+    StickDecoder sticks;
     std::vector<unsigned char> previous;
     while (running) {
         unsigned char data[32] = {};
@@ -172,6 +229,7 @@ int main(int argc, char** argv) {
             previous.assign(data, data + size);
         }
         decoder.onPacket(data, size);
+        sticks.onPacket(data, size);
         std::cout.flush();
     }
     libusb_release_interface(handle, s.iface);
