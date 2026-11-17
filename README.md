@@ -31,7 +31,7 @@ lsusb -d 2345:e053
 ./build/xbox_usb_test
 ```
 
-Press buttons to inspect events and raw packets; Ctrl+C exits.
+Press buttons to inspect events, and move the left/right sticks to view decoded LX/LY/RX/RY values (-32768..32767), plus normalized values (-1..+1). Ctrl+C exits.\n\nFor a quieter joystick test, suppress raw hex dumps:\n\n```bash\nsudo ./build/xbox_usb_test --no-raw\n```\n\nOnly one stick axis should change significantly when moving that stick horizontally or vertically. Check signs on your actual hardware; do not assume vehicle steering orientation from USB axis signs.
 
 Optional:
 
