@@ -13,3 +13,6 @@ models/*.pt
 models/*.engine
 *.avi
 *.mp4
+
+# Local Python environment used only for ONNX export
+.venv-pose/
