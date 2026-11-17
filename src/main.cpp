@@ -122,7 +122,7 @@ public:
                       << std::noshowpos << ")";
             lastPrinted_[i] = axes[i];
         }
-        std::cout << "\\n";
+        std::cout << '\n';
         initialized_ = true;
     }
 
