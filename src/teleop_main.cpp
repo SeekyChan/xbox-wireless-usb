@@ -81,10 +81,10 @@ Config readConfig(const std::string& filename) {
     if (!(seen_ip && seen_plc_port && seen_local_port && seen_mode &&
           seen_vx && seen_vy && seen_wz))
         throw std::runtime_error("missing required configuration fields");
-    if (cfg.plc_ip.empty() || cfg.max_vx_mps <= 0 || cfg.max_vy_mps <= 0 ||
+    if (cfg.plc_ip.empty() || cfg.max_vx_mps <= 0 || cfg.max_vy_mps < 0 ||
         cfg.max_wz_radps <= 0 || cfg.max_vx_mps > 1.0 || cfg.max_vy_mps > 1.0 ||
         cfg.max_wz_radps > 1.0)
-        throw std::runtime_error("invalid IP or speed limits (must be >0 and <=1.0)");
+        throw std::runtime_error("invalid IP or speed limits (Vx/Wz >0, Vy >=0, all <=1.0)");
     return cfg;
 }
 
