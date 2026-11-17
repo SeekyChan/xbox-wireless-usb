@@ -32,3 +32,25 @@ if(BUILD_TESTING)
     target_compile_options(plc_packet_test PRIVATE -Wall -Wextra -Wpedantic)
     add_test(NAME plc_packet_test COMMAND plc_packet_test)
 endif()
+
+# Phase 1: camera-only person detection / tracking.
+# Deliberately independent of libusb / PLC UDP / robot motion.
+# OpenCV is optional so original USB+PLC binaries still build without it.
+find_package(OpenCV QUIET COMPONENTS core imgproc highgui videoio objdetect)
+if(OpenCV_FOUND)
+    add_executable(person_vision src/person_vision_main.cpp)
+    target_include_directories(person_vision PRIVATE include ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(person_vision PRIVATE ${OpenCV_LIBS})
+    target_compile_options(person_vision PRIVATE -Wall -Wextra -Wpedantic)
+    install(TARGETS person_vision RUNTIME DESTINATION bin)
+else()
+    message(STATUS "OpenCV not found; skipping person_vision (install libopencv-dev)")
+endif()
+
+if(BUILD_TESTING)
+    # The tracker itself is pure C++11 and can be tested without a camera.
+    add_executable(person_tracker_test tests/person_tracker_test.cpp)
+    target_include_directories(person_tracker_test PRIVATE include)
+    target_compile_options(person_tracker_test PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME person_tracker_test COMMAND person_tracker_test)
+endif()
