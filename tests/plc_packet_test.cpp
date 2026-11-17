@@ -1,5 +1,8 @@
 #include "plc_udp.hpp"
 #include <arpa/inet.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <cstdint>
 #include <iostream>
