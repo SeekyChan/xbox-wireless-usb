@@ -119,10 +119,10 @@ int main(int argc, char** argv) {
               << "\nMode: " << (live ? "LIVE UDP" : "DRY RUN (no UDP)")
               << ", PLC=" << config.plc_ip << ":" << config.plc_port
               << ", max vx=" << config.max_vx_mps
-              << " m/s, max vy=" << config.max_vy_mps
+              << " m/s, vy DISABLED"
               << " m/s, max wz=" << config.max_wz_radps << " rad/s\n"
               << "Scale: 0.2 -> signed integer 200 for the PLC.\n"
-              << "LY forward/back, LX strafe, RX rotate; RB held = enable.\n"
+              << "LY forward/back, RX rotate; LX ignored (Vy=0); RB held = enable.\n"
               << "CAUTION: physical robot may move; physical E-stop and independent PLC watchdog required.\n";
 
     PlcUdp plc;
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
         const bool enabled = freshInput && state.rb;
 
         const double vx = enabled ? deadzone(state.ly) * config.max_vx_mps : 0.0;
-        const double vy = enabled ? -deadzone(state.lx) * config.max_vy_mps : 0.0;
+        const double vy = 0.0; // This chassis is configured without lateral drive.
         const double wz = enabled ? -deadzone(state.rx) * config.max_wz_radps : 0.0;
 
         if (live && !plc.sendVelocity(vx, vy, wz, enabled)) {
